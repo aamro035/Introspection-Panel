@@ -1,0 +1,34 @@
+// Arduino: 3 pots + 2 buttons -> ESP32
+
+const int sun = A0, mood = A1, water = A2;
+const int rightBtn = 7, leftBtn = 6;
+
+bool rToggle = false, lToggle = false;
+bool rPress = false, lPress = false;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(rightBtn, INPUT_PULLUP);
+  pinMode(leftBtn, INPUT_PULLUP);
+}
+
+void loop() {
+  // Button toggles
+  bool r = digitalRead(rightBtn) == LOW;
+  bool l = digitalRead(leftBtn) == LOW;
+  
+  if(r && !rPress) { delay(50); if(digitalRead(rightBtn) == LOW) rToggle = !rToggle; rPress = true; }
+  if(!r) rPress = false;
+  
+  if(l && !lPress) { delay(50); if(digitalRead(leftBtn) == LOW) lToggle = !lToggle; lPress = true; }
+  if(!l) lPress = false;
+  
+  // Send: sun,mood,water,right,left
+  Serial.print(map(analogRead(sun), 0, 1023, 0, 255)); Serial.print(",");
+  Serial.print(map(analogRead(mood), 0, 1023, 0, 255)); Serial.print(",");
+  Serial.print(analogRead(water)); Serial.print(",");
+  Serial.print(rToggle); Serial.print(",");
+  Serial.println(lToggle);
+  
+  delay(20);
+}
