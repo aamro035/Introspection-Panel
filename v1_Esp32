@@ -1,0 +1,96 @@
+#include <Adafruit_NeoPixel.h>
+// ---------- WS2812 SETUP ----------
+#define WS_LEFT_PIN 5    // Left group strip
+#define WS_RIGHT_PIN 27  // Right group strip
+#define WS_COUNT 7
+Adafruit_NeoPixel stripLeft(WS_COUNT, WS_LEFT_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel stripRight(WS_COUNT, WS_RIGHT_PIN, NEO_GRB + NEO_KHZ800);
+// ---------- LED GROUPS ----------
+int rightLeds[] = {15, 2, 32};  // Right group
+int leftLeds[] = {26, 25, 33};   // Left group
+// ---------- STATE ----------
+int sunBright = 0;      // Overall brightness for all lights
+int moodValue = 0;      // Color mood (0-255: blue->orange->red)
+int waterLevel = 0;
+bool rightOn = false;
+bool leftOn = false;
+void setup() {
+Serial.begin(115200);
+Serial2.begin(115200, SERIAL_8N1, 16, -1);
+  // Initialize all LED pins
+for(int i = 0; i < 3; i++) {
+pinMode(rightLeds[i], OUTPUT);
+pinMode(leftLeds[i], OUTPUT);
+}
+stripRight.begin();
+stripLeft.begin();
+stripRight.show();
+stripLeft.show();
+}
+uint32_t getMoodColor(int mood) {
+  // Map mood (0-255) to three colors: Blue → Orange → Red
+if (mood < 85) {
+    // Blue
+return stripLeft.Color(0, 0, 255);
+} else if (mood < 170) {
+    // Orange
+return stripLeft.Color(255, 165, 0);
+} else {
+    // Red
+return stripLeft.Color(255, 0, 0);
+}
+}
+void updateLEDs() {
+  // Calculate which groups are active (0-4 based on water level)
+int activeGroups = map(waterLevel, 0, 1023, 0, 4);
+  // Update regular LEDs for each group
+for(int g = 0; g < 3; g++) {
+int brightness = (g < activeGroups) ? sunBright : 0;
+if(rightOn) analogWrite(rightLeds[g], brightness);
+else digitalWrite(rightLeds[g], LOW);
+if(leftOn) analogWrite(leftLeds[g], brightness);
+else digitalWrite(leftLeds[g], LOW);
+}
+  // Update WS2812 strips (group 4)
+if(activeGroups >= 4) {
+uint32_t color = getMoodColor(moodValue);
+if(rightOn) {
+stripRight.setBrightness(sunBright);
+stripRight.fill(color);
+stripRight.show();
+} else {
+stripRight.clear();
+stripRight.show();
+}
+if(leftOn) {
+stripLeft.setBrightness(sunBright);
+stripLeft.fill(color);
+stripLeft.show();
+} else {
+stripLeft.clear();
+stripLeft.show();
+}
+} else {
+stripRight.clear();
+stripLeft.clear();
+stripRight.show();
+stripLeft.show();
+}
+}
+void loop() {
+if(Serial2.available()) {
+    String data = Serial2.readStringUntil('\n');
+    // Parse: sun,mood,water,right,left
+int idx[4];
+idx[0] = data.indexOf(',');
+for(int i = 1; i < 4; i++) idx[i] = data.indexOf(',', idx[i-1] + 1);
+if(idx[3] == -1) return;
+    sunBright = constrain(data.substring(0, idx[0]).toInt(), 0, 255);
+    moodValue = constrain(data.substring(idx[0]+1, idx[1]).toInt(), 0, 255);
+    waterLevel = constrain(data.substring(idx[1]+1, idx[2]).toInt(), 0, 1023);
+    rightOn = data.substring(idx[2]+1, idx[3]).toInt() == 1;
+    leftOn = data.substring(idx[3]+1).toInt() == 1;
+    // Update all LEDs
+updateLEDs();
+}
+} 
